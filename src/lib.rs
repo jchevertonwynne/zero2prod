@@ -1,12 +1,12 @@
 use std::net::TcpListener;
 
-use actix_web::{App, HttpResponse, HttpServer, Responder, dev::Server, web};
+use actix_web::{dev::Server, web, App, HttpResponse, HttpServer, Responder};
 
 async fn health_check() -> impl Responder {
     HttpResponse::Ok()
 }
 
-pub fn run_default()  -> Result<Server, std::io::Error> {
+pub fn run_default() -> Result<Server, std::io::Error> {
     let listener = TcpListener::bind("127.0.0.1:8000")?;
     run(listener)
 }
