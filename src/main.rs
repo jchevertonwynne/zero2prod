@@ -1,4 +1,4 @@
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    zero2prod::run_default()?.await
+    zero2prod::startup::run_default()?.await
 }
