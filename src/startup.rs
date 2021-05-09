@@ -2,14 +2,14 @@ use std::net::TcpListener;
 
 use actix_web::{dev::Server, web, App, HttpServer};
 
-use crate::routes::{self, health_check, subscribe};
+use crate::routes::{health_check, subscribe};
 
-pub fn run_default() -> Result<Server, std::io::Error> {
+pub fn run() -> Result<Server, std::io::Error> {
     let listener = TcpListener::bind("127.0.0.1:8000")?;
-    run(listener)
+    run_on(listener)
 }
 
-pub fn run(listener: TcpListener) -> Result<Server, std::io::Error> {
+pub fn run_on(listener: TcpListener) -> Result<Server, std::io::Error> {
     let server = HttpServer::new(|| {
         App::new()
             .route("/health_check", web::get().to(health_check))

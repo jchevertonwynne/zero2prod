@@ -64,7 +64,7 @@ async fn subscribe_returns_400_for_invalid_form() {
 fn spawn_app() -> String {
     let listener = TcpListener::bind("localhost:0").expect("failed to find random port");
     let port = listener.local_addr().expect("should have port").port();
-    let server = zero2prod::startup::run(listener).expect("failed to bind address");
+    let server = zero2prod::startup::run_on(listener).expect("failed to bind address");
     let _ = tokio::spawn(server);
     format!("http://localhost:{}", port)
 }
