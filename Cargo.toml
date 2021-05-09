@@ -18,9 +18,14 @@ actix-service = "2.0.0"
 actix-web = "4.0.0-beta.6"
 chrono = "0.4.19"
 config = "0.11.0"
-reqwest = "0.11.3"
+once_cell = "1.7.2"
 serde = "1.0.125"
 tokio = "1.5.0"
+tracing = { version = "0.1", features = ["log"] }
+tracing-bunyan-formatter = "0.2.4"
+tracing-futures = "0.2.5"
+tracing-log = "0.1.2"
+tracing-subscriber = {version = "0.2.18", features = ["registry", "env-filter"] }
 uuid = {version = "0.8.2", features = ["v4"]}
 
 [dependencies.sqlx]
@@ -34,3 +39,6 @@ features = [
     "chrono",
     "migrate"
 ]
+
+[dev-dependencies]
+reqwest = "0.11.3"
