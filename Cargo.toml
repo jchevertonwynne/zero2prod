@@ -16,9 +16,12 @@ actix-http = "3.0.0-beta.6"
 actix-rt = "2.2.0"
 actix-service = "2.0.0"
 actix-web = "4.0.0-beta.6"
+chrono = "0.4.19"
+config = "0.11.0"
 reqwest = "0.11.3"
 serde = "1.0.125"
 tokio = "1.5.0"
+uuid = {version = "0.8.2", features = ["v4"]}
 
 [dependencies.sqlx]
 version = "0.5.1"
