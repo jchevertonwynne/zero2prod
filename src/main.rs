@@ -11,10 +11,10 @@ async fn main() -> std::io::Result<()> {
     init_subscriber(subscriber);
 
     let config = configuration::get_config().expect("config file not found");
-    let address = format!("127.0.0.1:{}", config.application_port);
+    let address = format!("{}:{}", config.application.host, config.application.port);
     let listener = TcpListener::bind(address)?;
-    let pg_pool = PgPool::connect(&config.database.connection_string())
-        .await
+    let pg_pool = PgPool::connect_lazy(&config.database.connection_string())
+        // .await
         .expect("unable to create pool");
     zero2prod::startup::run_on(listener, pg_pool)?.await
 }

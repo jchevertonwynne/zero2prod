@@ -10,7 +10,7 @@ pub struct FormData {
     email: String,
 }
 
-#[tracing::instrument(name="Adding a new subscriber", skip(form, pool), fields(request_id = %Uuid::new_v4(), email = %form.email, user_name = %form.name))]
+#[tracing::instrument(name="Adding a new subscriber", skip(form, pool), fields(email = %form.email, user_name = %form.name))]
 pub async fn subscribe(form: web::Form<FormData>, pool: web::Data<PgPool>) -> impl Responder {
     match insert_new_user(&form, pool.get_ref()).await {
         Ok(_) => {
@@ -23,7 +23,8 @@ pub async fn subscribe(form: web::Form<FormData>, pool: web::Data<PgPool>) -> im
         }
     }
 }
-#[tracing::instrument(name="saving new subscriber to the database", skip(form, pool))]
+
+#[tracing::instrument(name = "saving new subscriber to the database", skip(form, pool))]
 async fn insert_new_user(form: &FormData, pool: &PgPool) -> Result<(), sqlx::Error> {
     sqlx::query!(
         r#"

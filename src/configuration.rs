@@ -1,7 +1,15 @@
+use std::convert::{TryFrom, TryInto};
+
 #[derive(serde::Deserialize)]
 pub struct Settings {
     pub database: DatabaseSettings,
-    pub application_port: u16,
+    pub application: ApplicationSettings,
+}
+
+#[derive(serde::Deserialize)]
+pub struct ApplicationSettings {
+    pub port: u16,
+    pub host: String,
 }
 
 #[derive(serde::Deserialize)]
@@ -15,8 +23,52 @@ pub struct DatabaseSettings {
 
 pub fn get_config() -> Result<Settings, config::ConfigError> {
     let mut settings = config::Config::default();
-    settings.merge(config::File::with_name("configutation"))?;
+    let base_path = std::env::current_dir().expect("failed to get current directory");
+    let configuration_directory = base_path.join("configuration");
+
+    settings.merge(config::File::from(configuration_directory.join("base")).required(true))?;
+
+    let environment: Environment = std::env::var("APP_ENVIRONMENT")
+        .unwrap_or_else(|_| "local".into())
+        .try_into()
+        .expect("failed to parse APP_ENVIRONMENT");
+
+    settings.merge(
+        config::File::from(configuration_directory.join(environment.to_string().as_str()))
+            .required(true),
+    )?;
+    settings.merge(config::Environment::with_prefix("app").separator("__"))?;
+
     settings.try_into()
+}
+
+enum Environment {
+    Local,
+    Production,
+}
+
+impl ToString for Environment {
+    fn to_string(&self) -> String {
+        match self {
+            Environment::Local => "local".into(),
+            Environment::Production => "production".into(),
+        }
+    }
+}
+
+impl TryFrom<String> for Environment {
+    type Error = String;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        match value.to_lowercase().as_str() {
+            "local" => Ok(Self::Local),
+            "production" => Ok(Self::Production),
+            _ => Err(format!(
+                "{} is not a supported environment, use `local` or `production`",
+                value
+            )),
+        }
+    }
 }
 
 impl DatabaseSettings {

@@ -12,16 +12,17 @@ path = "src/main.rs"
 name = "zero2prod"
 
 [dependencies]
-actix-http = "3.0.0-beta.6"
+actix-http = "3.0.0-beta.5"
 actix-rt = "2.2.0"
-actix-service = "2.0.0"
-actix-web = "4.0.0-beta.6"
+actix-service = "2.0.0-beta.5"
+actix-web = "4.0.0-beta.5"
 chrono = "0.4.19"
 config = "0.11.0"
 once_cell = "1.7.2"
 serde = "1.0.125"
 tokio = "1.5.0"
 tracing = { version = "0.1", features = ["log"] }
+tracing-actix-web = "0.4.0-beta.4"
 tracing-bunyan-formatter = "0.2.4"
 tracing-futures = "0.2.5"
 tracing-log = "0.1.2"
@@ -37,7 +38,8 @@ features = [
     "postgres",
     "uuid",
     "chrono",
-    "migrate"
+    "migrate",
+    "offline"
 ]
 
 [dev-dependencies]

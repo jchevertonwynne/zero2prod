@@ -1,8 +1,10 @@
+use common::spawn_app;
+
 mod common;
 
 #[actix_rt::test]
 async fn subscribe_returns_200_for_valid_form() {
-    let test_app = common::spawn_app().await;
+    let test_app = spawn_app().await;
     let client = reqwest::Client::new();
     let body = "name=joseph&email=jchevertonwynne%40gmail.com";
 
@@ -25,7 +27,7 @@ async fn subscribe_returns_200_for_valid_form() {
 
 #[actix_rt::test]
 async fn subscribe_returns_400_for_invalid_form() {
-    let test_app = common::spawn_app().await;
+    let test_app = spawn_app().await;
     let client = reqwest::Client::new();
 
     let test_cases = [
