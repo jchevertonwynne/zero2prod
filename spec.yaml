@@ -33,7 +33,7 @@ services:
     # For production workloads we'd go for at least two!
     # But let's try to keep the bill under control for now...
     instance_count: 1
-    instance_size_slug: s-2vcpu-4gb
+    instance_size_slug: basic-xxs
     # All incoming requests should be routed to our app
     routes:
       - path: /
