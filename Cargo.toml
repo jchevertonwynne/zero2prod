@@ -20,6 +20,7 @@ chrono = "0.4.19"
 config = "0.11.0"
 once_cell = "1.7.2"
 serde = "1.0.125"
+serde-aux = "2.2.0"
 tokio = "1.5.0"
 tracing = { version = "0.1", features = ["log"] }
 tracing-actix-web = "0.4.0-beta.4"

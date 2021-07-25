@@ -12,6 +12,6 @@ async fn health_check_works() {
         .await
         .expect("failed to execute request");
 
-    assert_eq!(response.status().as_u16(), 200);
+    assert_eq!(response.status(), reqwest::StatusCode::OK);
     assert_eq!(response.content_length(), Some(0));
 }

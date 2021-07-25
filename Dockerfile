@@ -1,9 +1,14 @@
+# stolen from https://github.com/eeff/zero2prod/blob/main/Dockerfile
 FROM rust:1.53 AS builder
 WORKDIR /app
-COPY . .
+RUN cargo install --locked --branch master \
+    --git https://github.com/eeff/cargo-build-deps
+COPY Cargo.toml Cargo.lock ./
+RUN cargo build-deps --release
 ENV SQLX_OFFLINE true
+COPY . .
 RUN cargo build --release --bin zero2prod
-RUN cargo build --release --bin zero2prod
+
 
 FROM debian:buster-slim AS runtime
 WORKDIR /app
