@@ -36,7 +36,7 @@ async fn subscribe_returns_400_for_invalid_form() {
         ("", "missing both params"),
     ];
 
-    for &(body, err_msg) in test_cases.iter() {
+    for (body, description) in test_cases {
         let response = client
             .post(format!("{}/subscriptions", test_app.address))
             .header("Content-Type", "application/x-www-form-urlencoded")
@@ -49,7 +49,36 @@ async fn subscribe_returns_400_for_invalid_form() {
             response.status().as_u16(),
             400,
             "the api did not return a 400 when {}",
-            err_msg
+            description
+        );
+    }
+}
+
+#[actix_rt::test]
+async fn subscribe_returns_400_when_fields_are_present_but_empty() {
+    let test_app = spawn_app().await;
+    let client = reqwest::Client::new();
+
+    let test_cases = [
+        ("name=&email=j@gmail.com", "empty name"),
+        ("name=joseph&email=", "empty email"),
+        ("name=joseph&email=yolo", "invalid email"),
+    ];
+
+    for (body, description) in test_cases {
+        let response = client
+            .post(format!("{}/subscriptions", test_app.address))
+            .header("Content-Type", "application/x-www-form-urlencoded")
+            .body(body)
+            .send()
+            .await
+            .expect("failed to execute request");
+
+        assert_eq!(
+            response.status().as_u16(),
+            400,
+            "the api did not return a 200 OK when the payload was {}",
+            description
         );
     }
 }
