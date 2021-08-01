@@ -38,6 +38,7 @@ impl EmailClient {
             html_body: html_content,
             text_body: text_content,
         };
+        tracing::info!("sending email request to {} with auth token of {}", dest_url, self.auth_token);
         self.client
             .post(&dest_url)
             .header("X-Postmark-Server-Token", &self.auth_token)

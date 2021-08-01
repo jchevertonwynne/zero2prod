@@ -75,11 +75,6 @@ pub async fn subscribe(
         }
     };
 
-    if let Err(err) = transaction.commit().await {
-        tracing::info!("failed to complete transaction: {}", err);
-        return HttpResponse::InternalServerError();
-    };
-
     if let Err(err) = send_confirmation_email(
         &email_client,
         new_subscriber,
@@ -91,6 +86,11 @@ pub async fn subscribe(
         tracing::error!("failed to send email: {:?}", err);
         return HttpResponse::InternalServerError();
     }
+
+    if let Err(err) = transaction.commit().await {
+        tracing::info!("failed to complete transaction: {}", err);
+        return HttpResponse::InternalServerError();
+    };
 
     HttpResponse::Ok()
 }
