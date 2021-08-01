@@ -1,6 +1,4 @@
-use common::spawn_app;
-
-mod common;
+use crate::common::spawn_app;
 
 #[actix_rt::test]
 async fn health_check_works() {
