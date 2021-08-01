@@ -9,6 +9,15 @@ jobs:
   test:
     name: Test
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:12
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
@@ -18,11 +27,9 @@ jobs:
           override: true
       - name: Migrate database
         run: |
-        sudo apt-get install libpq-dev -y
-        cargo install --version=0.5.1 sqlx-cli --no-default-features --features posgres
-        SKIP_DOCKER=true ./scripts/init_db.sh
-      - name: Check sqlx metadata table
-          run: cargo sqlx prepare --check -- --bin zero2prod
+          sudo apt-get install libpq-dev -y
+          cargo install --version=0.5.5 --locked sqlx-cli --no-default-features --features postgres
+          SKIP_DOCKER=true ./scripts/init_db.sh
       - uses: actions-rs/cargo@v1
         with:
           command: test
@@ -45,13 +52,27 @@ jobs:
   clippy:
     name: Clippy
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:12
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
         with:
+          components: clippy
           toolchain: stable
           override: true
-          components: clippy
+      - name: Migrate database
+        run: |
+          sudo apt-get install libpq-dev -y
+          cargo install --version=0.5.5 --locked sqlx-cli --no-default-features --features postgres
+          SKIP_DOCKER=true ./scripts/init_db.sh
       - uses: actions-rs/clippy-check@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -60,6 +81,15 @@ jobs:
   coverage:
     name: Code coverage
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:12
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
@@ -70,8 +100,12 @@ jobs:
           toolchain: stable
           override: true
 
+      - name: Migrate database
+        run: |
+          sudo apt-get install libpq-dev -y
+          cargo install --version=0.5.5 --locked sqlx-cli --no-default-features --features postgres
+          SKIP_DOCKER=true ./scripts/init_db.sh
       - name: Run cargo-tarpaulin
         uses: actions-rs/tarpaulin@v0.1
         with:
-          version: '0.13.3'
           args: '--ignore-tests'
