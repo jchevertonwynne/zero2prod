@@ -95,8 +95,14 @@ pub async fn subscribe(
     HttpResponse::Ok()
 }
 
-#[tracing::instrument(name = "saving new subscriber to the database", skip(subscriber, transaction))]
-async fn insert_new_user(subscriber: &NewSubscriber, transaction: &mut Transaction<'_, Postgres>) -> Result<Uuid, sqlx::Error> {
+#[tracing::instrument(
+    name = "saving new subscriber to the database",
+    skip(subscriber, transaction)
+)]
+async fn insert_new_user(
+    subscriber: &NewSubscriber,
+    transaction: &mut Transaction<'_, Postgres>,
+) -> Result<Uuid, sqlx::Error> {
     let uuid = Uuid::new_v4();
     sqlx::query!(
         r#"
@@ -113,8 +119,14 @@ async fn insert_new_user(subscriber: &NewSubscriber, transaction: &mut Transacti
     Ok(uuid)
 }
 
-#[tracing::instrument(name = "adding subscription token to the database", skip(subscriber_id, transaction))]
-async fn add_subscription_token(subscriber_id: Uuid, transaction: &mut Transaction<'_, Postgres>) -> Result<SubscriptionToken, sqlx::Error> {
+#[tracing::instrument(
+    name = "adding subscription token to the database",
+    skip(subscriber_id, transaction)
+)]
+async fn add_subscription_token(
+    subscriber_id: Uuid,
+    transaction: &mut Transaction<'_, Postgres>,
+) -> Result<SubscriptionToken, sqlx::Error> {
     let token = generate_subscription_token();
     sqlx::query!(
         "INSERT INTO subscription_tokens (subscription_token, subscriber_id) VALUES ($1, $2)",
@@ -193,12 +205,24 @@ pub async fn confirm_registration(
         }
     };
 
-    if let Err(err) = sqlx::query!("UPDATE subscriptions SET status = 'confirmed' WHERE id = $1", record.subscriber_id).execute(&mut transaction).await {
+    if let Err(err) = sqlx::query!(
+        "UPDATE subscriptions SET status = 'confirmed' WHERE id = $1",
+        record.subscriber_id
+    )
+    .execute(&mut transaction)
+    .await
+    {
         tracing::info!("failed to update user status: {}", err);
         return HttpResponse::InternalServerError();
     };
 
-    if let Err(err) = sqlx::query!("DELETE FROM subscription_tokens WHERE subscription_token = $1", params.0.subscription_token).execute(&mut transaction).await {
+    if let Err(err) = sqlx::query!(
+        "DELETE FROM subscription_tokens WHERE subscription_token = $1",
+        params.0.subscription_token
+    )
+    .execute(&mut transaction)
+    .await
+    {
         tracing::info!("failed to remove used subscription token: {}", err);
         return HttpResponse::InternalServerError();
     };
