@@ -167,6 +167,7 @@ pub struct ConfirmRegistrationParams {
     subscription_token: String,
 }
 
+#[allow(clippy::async_yields_async)]
 #[tracing::instrument(name = "confirming registration", skip(params, pool))]
 pub async fn confirm_registration(
     params: web::Query<ConfirmRegistrationParams>,
