@@ -7,6 +7,6 @@ database:
   password: "password"
   database_name: "newsletter"
 email_client:
-  base_url: "localhost"
+  base_url: "https://api.postmarkapp.com"
   sender_email: "joseph.cheverton-wynne@bjss.com"
   auth_token: "lmaoIAmSecret"
