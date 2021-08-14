@@ -146,3 +146,18 @@ async fn confirmation_requests_with_valid_token_are_accepted_and_user_marked_as_
     .expect("query failed");
     assert_eq!(confirmation_status.status, "confirmed");
 }
+
+#[actix_rt::test]
+async fn subscribe_fails_on_fatal_db_error() {
+    let test_app = spawn_app().await;
+    let valid_input = "name=joseph&email=jchevertonwynne%40gmail.com";
+
+    sqlx::query!("ALTER TABLE subscriptions DROP COLUMN email;")
+        .execute(&test_app.db_pool)
+        .await
+        .unwrap();
+
+    let response = test_app.post_subscriptions(valid_input.to_string()).await;
+
+    assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+}
