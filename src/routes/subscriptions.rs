@@ -14,6 +14,19 @@ use uuid::Uuid;
 
 use crate::{domain::NewSubscriber, email_client::EmailClient, startup::ApplicationBaseUrl};
 
+fn error_chain_fmt(
+    e: &impl std::error::Error,
+    f: &mut std::fmt::Formatter<'_>,
+) -> std::fmt::Result {
+    writeln!(f, "{}\n", e)?;
+    let mut current = e.source();
+    while let Some(cause) = current {
+        writeln!(f, "Caused by:\n\t{}", cause)?;
+        current = cause.source();
+    }
+    Ok(())
+}
+
 #[derive(serde::Deserialize)]
 pub struct FormData {
     name: String,
@@ -74,19 +87,6 @@ impl std::error::Error for StoreTokenError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         Some(&self.0)
     }
-}
-
-fn error_chain_fmt(
-    e: &impl std::error::Error,
-    f: &mut std::fmt::Formatter<'_>,
-) -> std::fmt::Result {
-    writeln!(f, "{}\n", e)?;
-    let mut current = e.source();
-    while let Some(cause) = current {
-        writeln!(f, "Caused by:\n\t{}", cause)?;
-        current = cause.source();
-    }
-    Ok(())
 }
 
 #[allow(clippy::async_yields_async)]
@@ -204,9 +204,32 @@ async fn send_confirmation_email(
         .await
 }
 
-#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize, Debug)]
 pub struct ConfirmRegistrationParams {
     subscription_token: String,
+}
+
+#[derive(thiserror::Error)]
+pub enum ConfirmationError {
+    #[error("{0}")]
+    ValidationError(String),
+    #[error(transparent)]
+    UnexpectedError(#[from] anyhow::Error),
+}
+
+impl Debug for ConfirmationError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        error_chain_fmt(self, f)
+    }
+}
+
+impl ResponseError for ConfirmationError {
+    fn status_code(&self) -> StatusCode {
+        match self {
+            ConfirmationError::ValidationError(_) => StatusCode::BAD_REQUEST,
+            ConfirmationError::UnexpectedError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+        }
+    }
 }
 
 #[allow(clippy::async_yields_async)]
@@ -214,68 +237,81 @@ pub struct ConfirmRegistrationParams {
 pub async fn confirm_registration(
     params: web::Query<ConfirmRegistrationParams>,
     pool: web::Data<PgPool>,
-) -> HttpResponse {
-    let mut transaction = match pool.begin().await {
-        Ok(transaction) => transaction,
-        Err(err) => {
-            tracing::info!("failed to create transaction: {}", err);
-            return HttpResponse::InternalServerError().finish();
-        }
-    };
-    let response = sqlx::query!(
+) -> Result<HttpResponse, ConfirmationError> {
+    let mut transaction = pool.begin().await.context("failed to create transaction")?;
+
+    let user_id = find_user_id_by_confirmation_token(&params, &mut transaction)
+        .await
+        .context("failed to query registration token")?
+        .ok_or_else(|| {
+            ConfirmationError::ValidationError("failed to find token in database".to_string())
+        })?;
+
+    update_user_status_to_confirmed(user_id, &mut transaction)
+        .await
+        .context("failed to update user's status to confirmed")?;
+
+    delete_used_subscription_token(&params, &mut transaction)
+        .await
+        .context("failed to remove used confirmation token")?;
+
+    transaction
+        .commit()
+        .await
+        .context("failed to complete transaction")?;
+
+    Ok(HttpResponse::Ok().finish())
+}
+
+#[tracing::instrument(
+    name = "finding user id for confirmation token",
+    skip(transaction)
+)]
+async fn find_user_id_by_confirmation_token(
+    params: &web::Query<ConfirmRegistrationParams>,
+    transaction: &mut Transaction<'_, Postgres>,
+) -> Result<Option<Uuid>, sqlx::Error> {
+    sqlx::query!(
         "SELECT subscriber_id from subscription_tokens WHERE subscription_token = $1",
         params.0.subscription_token
     )
-    .fetch_optional(&mut transaction)
-    .await;
-
-    let record = match response {
-        Ok(record) => record,
-        Err(err) => {
-            tracing::info!("failed to query registration token: {}", err);
-            return HttpResponse::InternalServerError().finish();
-        }
-    };
-
-    let record = match record {
-        Some(record) => record,
-        None => {
-            tracing::info!(
-                "failed to find registration token: {}",
-                params.0.subscription_token
-            );
-            return HttpResponse::BadRequest().finish();
-        }
-    };
-
-    if let Err(err) = sqlx::query!(
-        "UPDATE subscriptions SET status = 'confirmed' WHERE id = $1",
-        record.subscriber_id
-    )
-    .execute(&mut transaction)
+    .fetch_optional(transaction)
     .await
-    {
-        tracing::info!("failed to update user status: {}", err);
-        return HttpResponse::InternalServerError().finish();
-    };
+    .map(|r| r.map(|v| v.subscriber_id))
+}
 
-    if let Err(err) = sqlx::query!(
+#[tracing::instrument(
+    name = "updating user id to confirmed",
+    skip(transaction)
+)]
+async fn update_user_status_to_confirmed(
+    user_id: Uuid,
+    transaction: &mut Transaction<'_, Postgres>,
+) -> Result<(), sqlx::Error> {
+    sqlx::query!(
+        "UPDATE subscriptions SET status = 'confirmed' WHERE id = $1",
+        user_id
+    )
+    .execute(transaction)
+    .await
+    .map(|_| ())
+}
+
+#[tracing::instrument(
+    name = "deleting used confirmation token",
+    skip(transaction)
+)]
+async fn delete_used_subscription_token(
+    params: &web::Query<ConfirmRegistrationParams>,
+    transaction: &mut Transaction<'_, Postgres>,
+) -> Result<(), sqlx::Error> {
+    sqlx::query!(
         "DELETE FROM subscription_tokens WHERE subscription_token = $1",
         params.0.subscription_token
     )
-    .execute(&mut transaction)
+    .execute(transaction)
     .await
-    {
-        tracing::info!("failed to remove used subscription token: {}", err);
-        return HttpResponse::InternalServerError().finish();
-    };
-
-    if let Err(err) = transaction.commit().await {
-        tracing::info!("failed to complete transaction: {}", err);
-        return HttpResponse::InternalServerError().finish();
-    };
-
-    HttpResponse::Ok().finish()
+    .map(|_| ())
 }
 
 struct SubscriptionToken(String);
