@@ -176,7 +176,7 @@ async fn add_subscription_token(
     )
     .execute(transaction)
     .await
-    .map_err(|err| StoreTokenError(err))?;
+    .map_err(StoreTokenError)?;
     Ok(token)
 }
 
@@ -263,10 +263,7 @@ pub async fn confirm_registration(
     Ok(HttpResponse::Ok().finish())
 }
 
-#[tracing::instrument(
-    name = "finding user id for confirmation token",
-    skip(transaction)
-)]
+#[tracing::instrument(name = "finding user id for confirmation token", skip(transaction))]
 async fn find_user_id_by_confirmation_token(
     params: &web::Query<ConfirmRegistrationParams>,
     transaction: &mut Transaction<'_, Postgres>,
@@ -280,10 +277,7 @@ async fn find_user_id_by_confirmation_token(
     .map(|r| r.map(|v| v.subscriber_id))
 }
 
-#[tracing::instrument(
-    name = "updating user id to confirmed",
-    skip(transaction)
-)]
+#[tracing::instrument(name = "updating user id to confirmed", skip(transaction))]
 async fn update_user_status_to_confirmed(
     user_id: Uuid,
     transaction: &mut Transaction<'_, Postgres>,
@@ -297,10 +291,7 @@ async fn update_user_status_to_confirmed(
     .map(|_| ())
 }
 
-#[tracing::instrument(
-    name = "deleting used confirmation token",
-    skip(transaction)
-)]
+#[tracing::instrument(name = "deleting used confirmation token", skip(transaction))]
 async fn delete_used_subscription_token(
     params: &web::Query<ConfirmRegistrationParams>,
     transaction: &mut Transaction<'_, Postgres>,
