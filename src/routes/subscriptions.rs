@@ -265,12 +265,12 @@ pub async fn confirm_registration(
 
 #[tracing::instrument(name = "finding user id for confirmation token", skip(transaction))]
 async fn find_user_id_by_confirmation_token(
-    params: &web::Query<ConfirmRegistrationParams>,
+    params: &ConfirmRegistrationParams,
     transaction: &mut Transaction<'_, Postgres>,
 ) -> Result<Option<Uuid>, sqlx::Error> {
     sqlx::query!(
         "SELECT subscriber_id from subscription_tokens WHERE subscription_token = $1",
-        params.0.subscription_token
+        params.subscription_token
     )
     .fetch_optional(transaction)
     .await
@@ -293,12 +293,12 @@ async fn update_user_status_to_confirmed(
 
 #[tracing::instrument(name = "deleting used confirmation token", skip(transaction))]
 async fn delete_used_subscription_token(
-    params: &web::Query<ConfirmRegistrationParams>,
+    params: &ConfirmRegistrationParams,
     transaction: &mut Transaction<'_, Postgres>,
 ) -> Result<(), sqlx::Error> {
     sqlx::query!(
         "DELETE FROM subscription_tokens WHERE subscription_token = $1",
-        params.0.subscription_token
+        params.subscription_token
     )
     .execute(transaction)
     .await
