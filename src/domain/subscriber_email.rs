@@ -1,9 +1,15 @@
-use std::convert::TryInto;
+use std::{convert::TryInto, fmt::Display};
 
 use validator::validate_email;
 
 #[derive(Debug)]
 pub struct SubscriberEmail(String);
+
+impl Display for SubscriberEmail {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
 
 impl TryInto<SubscriberEmail> for String {
     type Error = String;
