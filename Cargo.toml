@@ -16,12 +16,14 @@ actix-http = "3.0.0-beta.8"
 actix-service = "2.0.0-beta.5"
 actix-web = "4.0.0-beta.8"
 anyhow = "1.0.43"
+base64 = "0.13.0"
 chrono = "0.4.19"
 config = "0.11.0"
 rand = { version = "0.8.4", features = ["std_rng"] }
 reqwest = { version = "0.11.3", features = ["json", "rustls-tls"] }
 serde = "1.0.125"
 serde-aux = "2.2.0"
+sha3 = "0.9.1"
 thiserror = "1.0.26"
 tracing = { version = "0.1", features = ["log"] }
 tracing-actix-web = "0.4.0-beta.4"

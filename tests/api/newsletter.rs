@@ -31,7 +31,7 @@ async fn newsletters_are_not_delivered_to_unconfirmed_subscribers() {
 }
 
 #[actix_rt::test]
-async fn newsletters_are_delivered_to_unconfirmed_subscribers() {
+async fn newsletters_are_delivered_to_confirmed_subscribers() {
     let app = spawn_app().await;
     create_confirmed_subscriber(&app).await;
 
@@ -86,6 +86,30 @@ async fn newsletters_returns_400_for_invalid_data() {
             error_message
         );
     }
+}
+
+#[actix_rt::test]
+async fn request_missing_auth_are_rejected() {
+    let app = spawn_app().await;
+
+    let response = reqwest::Client::new()
+        .post(&format!("{}/newsletter", &app.address))
+        .json(&serde_json::json!({
+            "title": "some title",
+            "content": {
+                "text": "text cont",
+                "html": "<b>html cont</b>"
+            }
+        }))
+        .send()
+        .await
+        .expect("failed to execute request");
+
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    assert_eq!(
+        response.headers()["WWW-Authenticate"],
+        r#"Basic realm="publish""#
+    );
 }
 
 async fn create_unconfirmed_subscriber(app: &TestApp) -> ConfirmationLinks {

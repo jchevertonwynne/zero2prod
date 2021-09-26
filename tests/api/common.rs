@@ -1,5 +1,6 @@
 use once_cell::sync::Lazy;
 use reqwest::Url;
+use sha3::Digest;
 use sqlx::{Connection, Executor, PgConnection, PgPool};
 use uuid::Uuid;
 use wiremock::MockServer;
@@ -27,6 +28,7 @@ pub struct TestApp {
     pub db_pool: PgPool,
     pub email_server: MockServer,
     pub port: u16,
+    pub test_user: TestUser
 }
 
 pub struct ConfirmationLinks {
@@ -48,6 +50,7 @@ impl TestApp {
     pub async fn post_newsletter(&self, body: serde_json::Value) -> reqwest::Response {
         reqwest::Client::new()
             .post(&format!("{}/newsletter", &self.address))
+            .basic_auth(&self.test_user.username, Some(&self.test_user.password))
             .json(&body)
             .send()
             .await
@@ -101,11 +104,16 @@ pub async fn spawn_app() -> TestApp {
         .await
         .expect("failed to connect to db");
 
+    let test_user = TestUser::generate();
+
+    test_user.store(&db_pool).await;
+
     TestApp {
         address,
         db_pool,
         email_server,
         port,
+        test_user
     }
 }
 
@@ -126,4 +134,32 @@ async fn configure_database(config: &DatabaseSettings) -> PgPool {
         .await
         .expect("failed to migrate the db");
     connection_pool
+}
+
+pub struct TestUser {
+    pub user_id: Uuid,
+    pub username: String,
+    pub password: String
+}
+
+impl TestUser {
+    pub fn generate() -> Self {
+        Self {
+            user_id: Uuid::new_v4(), 
+            username: Uuid::new_v4().to_string(), 
+            password: Uuid::new_v4().to_string()
+        }
+    }
+
+    async fn store(&self, pool: &PgPool) {
+        let digest = sha3::Sha3_256::digest(self.password.as_bytes());
+        let password_hash = format!("{:x}", digest);
+        sqlx::query!(
+            "INSERT INTO users (user_id, username, password_hash)
+            VALUES ($1, $2, $3)", 
+            self.user_id,
+            self.username, 
+            password_hash
+        ).execute(pool).await.expect("failed to create test users");
+    }
 }
