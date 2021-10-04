@@ -6,10 +6,15 @@ use actix_http::{
 };
 use actix_web::{http::header, web, HttpResponse, ResponseError};
 use anyhow::Context;
-use sha3::Digest;
+use argon2::{Argon2, PasswordHash, PasswordVerifier};
 use sqlx::PgPool;
+use uuid::Uuid;
 
-use crate::{common::error_chain_fmt, domain::SubscriberEmail, email_client::EmailClient};
+use crate::{
+    common::{error_chain_fmt, spawn_blocking_with_tracing},
+    domain::SubscriberEmail,
+    email_client::EmailClient,
+};
 
 #[derive(serde::Deserialize)]
 pub struct BodyData {
@@ -69,7 +74,7 @@ pub async fn publish_newsletter(
     let credentials = basic_authentication(request.headers()).map_err(PublishError::AuthError)?;
     tracing::Span::current().record("username", &tracing::field::display(&credentials.username));
 
-    let user_id = validate_credentials(&credentials, &pool).await?;
+    let user_id = validate_credentials(credentials, &pool).await?;
     tracing::Span::current().record("user_id", &tracing::field::display(&user_id));
 
     let confirmed_subscribers = get_confirmed_subscribers(&pool).await?;
@@ -101,30 +106,73 @@ pub async fn publish_newsletter(
     Ok(HttpResponse::Ok().finish())
 }
 
+#[tracing::instrument(name = "Validate credentials", skip(credentials, pool))]
 async fn validate_credentials(
-    credentials: &Credentials,
+    credentials: Credentials,
     pool: &PgPool,
 ) -> Result<uuid::Uuid, PublishError> {
-    let password_hash = sha3::Sha3_256::digest(credentials.password.as_bytes());
-    let password_hash = format!("{:x}", password_hash);
-    let user_id = sqlx::query!(
+    let mut user_id = None;
+    let mut expected_password_hash = "$argon2id$v=19$m=15000,t=2,p=1$\
+    gZiV/M1gPc22ElAH/Jh1Hw$\
+    CWOrkoo7oJBQ/iyh7uJ0LO2aLEfrHwTWllSAxT0zRno"
+        .to_string();
+
+    if let Some((stored_user_id, stored_password_hash)) = get_stored_credentials(&credentials, pool)
+        .await
+        .map_err(PublishError::UnexpectedError)?
+    {
+        user_id = Some(stored_user_id);
+        expected_password_hash = stored_password_hash;
+    }
+
+    spawn_blocking_with_tracing(move || {
+        verify_password_hash(expected_password_hash, credentials.password)
+    })
+    .await
+    .context("failed to spawn blocking task")
+    .map_err(PublishError::UnexpectedError)?
+    .context("invalid password")
+    .map_err(PublishError::AuthError)?;
+
+    user_id.ok_or_else(|| PublishError::AuthError(anyhow::anyhow!("unknown username")))
+}
+
+#[tracing::instrument(
+    name = "verify password hash",
+    skip(expected_password_hash, password_candidate)
+)]
+fn verify_password_hash(
+    expected_password_hash: String,
+    password_candidate: String,
+) -> Result<(), PublishError> {
+    let expected_password_hash = PasswordHash::new(&expected_password_hash)
+        .context("failed to parse hash in PHC string format")
+        .map_err(PublishError::UnexpectedError)?;
+
+    Argon2::default()
+        .verify_password(password_candidate.as_bytes(), &expected_password_hash)
+        .context("invalid password")
+        .map_err(PublishError::AuthError)
+}
+
+#[tracing::instrument(name = "retrieving user from database", skip(pool, credentials))]
+async fn get_stored_credentials(
+    credentials: &Credentials,
+    pool: &sqlx::Pool<sqlx::Postgres>,
+) -> Result<Option<(Uuid, String)>, anyhow::Error> {
+    let row: Option<_> = sqlx::query!(
         r#"
-        SELECT user_id
+        SELECT user_id, password_hash
         FROM users
-        WHERE username = $1 AND password_hash = $2
+        WHERE username = $1
         "#,
-        credentials.username,
-        password_hash
+        credentials.username
     )
     .fetch_optional(pool)
     .await
-    .context("failed to perform query to validate auth credentials")
-    .map_err(PublishError::UnexpectedError)?;
-
-    user_id
-        .map(|row| row.user_id)
-        .ok_or_else(|| anyhow::anyhow!("invalid username or password"))
-        .map_err(PublishError::AuthError)
+    .context("failed to perform query to retrieve stored credentials")?
+    .map(|row| (row.user_id, row.password_hash));
+    Ok(row)
 }
 
 struct Credentials {

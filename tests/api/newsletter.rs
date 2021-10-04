@@ -1,4 +1,5 @@
 use actix_http::StatusCode;
+use uuid::Uuid;
 use wiremock::{
     matchers::{any, method, path},
     Mock, ResponseTemplate,
@@ -109,6 +110,62 @@ async fn request_missing_auth_are_rejected() {
     assert_eq!(
         response.headers()["WWW-Authenticate"],
         r#"Basic realm="publish""#
+    );
+}
+
+#[actix_rt::test]
+async fn non_existing_user_is_rejected() {
+    let app = spawn_app().await;
+
+    let username = Uuid::new_v4().to_string();
+    let password = Uuid::new_v4().to_string();
+
+    let response = reqwest::Client::new()
+        .post(&format!("{}/newsletter", &app.address))
+        .basic_auth(username, Some(password))
+        .json(&serde_json::json!({
+            "title": "newsletter title",
+            "content": {
+                "text": "plain body",
+                "html": "<p> fancy body </p>"
+            }
+        }))
+        .send()
+        .await
+        .expect("failed to execute request");
+
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    assert_eq!(
+        r#"Basic realm="publish""#,
+        response.headers()["WWW-Authenticate"]
+    );
+}
+
+#[actix_rt::test]
+async fn invalid_password_is_rejected() {
+    let app = spawn_app().await;
+
+    let username = &app.test_user.username;
+    let password = Uuid::new_v4().to_string();
+
+    let response = reqwest::Client::new()
+        .post(&format!("{}/newsletter", &app.address))
+        .basic_auth(username, Some(password))
+        .json(&serde_json::json!({
+            "title": "newsletter title",
+            "content": {
+                "text": "plain body",
+                "html": "<p> fancy body </p>"
+            }
+        }))
+        .send()
+        .await
+        .expect("failed to execute request");
+
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    assert_eq!(
+        r#"Basic realm="publish""#,
+        response.headers()["WWW-Authenticate"]
     );
 }
 

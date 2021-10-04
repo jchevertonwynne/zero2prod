@@ -1,6 +1,6 @@
+use argon2::{password_hash::SaltString, Argon2, PasswordHasher};
 use once_cell::sync::Lazy;
 use reqwest::Url;
-use sha3::Digest;
 use sqlx::{Connection, Executor, PgConnection, PgPool};
 use uuid::Uuid;
 use wiremock::MockServer;
@@ -28,7 +28,7 @@ pub struct TestApp {
     pub db_pool: PgPool,
     pub email_server: MockServer,
     pub port: u16,
-    pub test_user: TestUser
+    pub test_user: TestUser,
 }
 
 pub struct ConfirmationLinks {
@@ -113,7 +113,7 @@ pub async fn spawn_app() -> TestApp {
         db_pool,
         email_server,
         port,
-        test_user
+        test_user,
     }
 }
 
@@ -139,27 +139,33 @@ async fn configure_database(config: &DatabaseSettings) -> PgPool {
 pub struct TestUser {
     pub user_id: Uuid,
     pub username: String,
-    pub password: String
+    pub password: String,
 }
 
 impl TestUser {
     pub fn generate() -> Self {
         Self {
-            user_id: Uuid::new_v4(), 
-            username: Uuid::new_v4().to_string(), 
-            password: Uuid::new_v4().to_string()
+            user_id: Uuid::new_v4(),
+            username: Uuid::new_v4().to_string(),
+            password: Uuid::new_v4().to_string(),
         }
     }
 
     async fn store(&self, pool: &PgPool) {
-        let digest = sha3::Sha3_256::digest(self.password.as_bytes());
-        let password_hash = format!("{:x}", digest);
+        let salt = SaltString::generate(&mut rand::thread_rng());
+        let password_hash = Argon2::default()
+            .hash_password(self.password.as_bytes(), &salt)
+            .unwrap()
+            .to_string();
         sqlx::query!(
             "INSERT INTO users (user_id, username, password_hash)
-            VALUES ($1, $2, $3)", 
+            VALUES ($1, $2, $3)",
             self.user_id,
-            self.username, 
+            self.username,
             password_hash
-        ).execute(pool).await.expect("failed to create test users");
+        )
+        .execute(pool)
+        .await
+        .expect("failed to create test users");
     }
 }
